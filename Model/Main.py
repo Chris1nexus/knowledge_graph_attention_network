@@ -248,8 +248,14 @@ if __name__ == '__main__':
         for idx in range(n_batch):
             btime= time()
 
-            batch_data = next(data_generator['loader'])# data_generator.generate_train_batch()
-            feed_dict = data_generator['dataset'].as_train_feed_dict(model, *batch_data)
+            batch_data = next(data_generator['loader'])
+            if args.model_type == 'cke':
+                batch_A_data = next(data_generator['A_loader'])
+                feed_dict = data_generator['dataset'].as_train_feed_dict(model, 
+                                                *batch_data, 
+                                                *batch_A_data)
+            else:
+                feed_dict = data_generator['dataset'].as_train_feed_dict(model, *batch_data)
 
             _, batch_loss, batch_base_loss, batch_kge_loss, batch_reg_loss = model.train(sess, feed_dict=feed_dict)
 
@@ -331,7 +337,7 @@ if __name__ == '__main__':
             print(perf_str)
 
         cur_best_pre_0, stopping_step, should_stop = early_stopping(ret['recall'][0], cur_best_pre_0,
-                                                                    stopping_step, expected_order='acc', flag_step=10)
+                                                                    stopping_step, expected_order='acc', flag_step=1000)
 
         # *********************************************************
         # early stopping when cur_best_pre_0 is decreasing for ten successive steps.

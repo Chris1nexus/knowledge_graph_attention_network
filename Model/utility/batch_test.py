@@ -29,19 +29,51 @@ Ks = eval(args.Ks)
 
 data_generator = {}
 if args.model_type == 'bprmf':
-    data_generator['dataset'] = BPRMF_loader(args=args, path=args.data_path + args.dataset)
+    ds =  BPRMF_loader(args=args, path=args.data_path + args.dataset)
+    data_generator['dataset'] = ds
+    data_generator['loader'] = cycle(DataLoader(ds, 
+                    batch_size=ds.batch_size, 
+                    shuffle=True,  
+                    num_workers=multiprocessing.cpu_count(),
+                        ))      
     batch_test_flag = False
 
 elif args.model_type == 'cke':
-    data_generator['dataset'] = CKE_loader(args=args, path=args.data_path + args.dataset)
+    cke_a_ds = CKE_loader(args=args, path=args.data_path + args.dataset)
+    cke_ds = RecomDataset(args=args, path=args.data_path + args.dataset)
+    data_generator['A_dataset'] = cke_a_ds
+    data_generator['dataset'] = cke_ds
+    data_generator['A_loader'] = cycle(DataLoader(cke_a_ds, 
+                    batch_size=cke_a_ds.batch_size_kg, 
+                    shuffle=True,  
+                    num_workers=multiprocessing.cpu_count(),
+                        ))
+    data_generator['loader'] = cycle(DataLoader(cke_ds, 
+                    batch_size=cke_ds.batch_size, 
+                    shuffle=True,  
+                    num_workers=multiprocessing.cpu_count(),
+                        ))  
+
     batch_test_flag = False
 
 elif args.model_type in ['cfkg']:
-    data_generator['dataset'] = CFKG_loader(args=args, path=args.data_path + args.dataset)
+    ds = CFKG_loader(args=args, path=args.data_path + args.dataset)
+    data_generator['dataset'] = ds
+    data_generator['loader'] = cycle(DataLoader(ds, 
+                    batch_size=ds.batch_size, 
+                    shuffle=True,  
+                    num_workers=multiprocessing.cpu_count(),
+                        ))        
     batch_test_flag = True
 
 elif args.model_type in ['fm','nfm']:
-    data_generator['dataset'] = NFM_loader(args=args, path=args.data_path + args.dataset)
+    ds = NFM_loader(args=args, path=args.data_path + args.dataset)
+    data_generator['dataset'] = ds
+    data_generator['loader'] = cycle(DataLoader(ds, 
+                    batch_size=ds.batch_size, 
+                    shuffle=True,  
+                    num_workers=multiprocessing.cpu_count(),
+                        ))    
     batch_test_flag = True
 
 elif args.model_type in ['kgat']:

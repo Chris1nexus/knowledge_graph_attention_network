@@ -10,8 +10,9 @@ from time import time
 import scipy.sparse as sp
 import random as rd
 import collections
+from utility.load_data import RecomDataset
 
-class CFKG_loader(Data):
+class CFKG_loader(RecomDataset):
     def __init__(self, args, path):
         super().__init__(args, path)
         self.batch_size_kg = self.batch_size
@@ -23,6 +24,8 @@ class CFKG_loader(Data):
 
         # generate the triples dictionary, key is 'head', value is '(tail, relation)'.
         self.all_kg_dict = self._get_all_kg_dict()
+        self.exist_heads = list(self.all_kg_dict.keys())
+        self.N_exist_heads = len(self.exist_heads)
 
         self.all_h_list, self.all_r_list, self.all_t_list, self.all_v_list = self._get_all_kg_data()
 
@@ -184,14 +187,16 @@ class CFKG_loader(Data):
 
         return new_h_list, new_r_list, new_t_list, new_v_list
 
-    def _generate_train_A_batch(self):
-        exist_heads = self.all_kg_dict.keys()
 
-        if self.batch_size_kg <= len(exist_heads):
-            heads = rd.sample(exist_heads, self.batch_size_kg)
-        else:
-            heads = [rd.choice(exist_heads) for _ in range(self.batch_size_kg)]
 
+
+    def __len__(self):
+        # number of existing heads after the preprocessing described in the paper, 
+        # determines the length of the training dataset, for which a positive an negative are extracted
+        return self.N_exist_heads
+    
+
+    def __getitem__(self, idx):      
         def sample_pos_triples_for_h(h, num):
             pos_triples = self.all_kg_dict[h]
             n_pos_triples = len(pos_triples)
@@ -219,20 +224,23 @@ class CFKG_loader(Data):
                     neg_ts.append(t)
             return neg_ts
 
-        pos_r_batch, pos_t_batch, neg_t_batch = [], [], []
 
-        for h in heads:
-            pos_rs, pos_ts = sample_pos_triples_for_h(h, 1)
-            pos_r_batch += pos_rs
-            pos_t_batch += pos_ts
+        h = self.exist_heads[idx]
+        pos_rs, pos_ts = sample_pos_triples_for_h(h, 1)
+        neg_ts = sample_neg_triples_for_h(h, pos_rs[0], 1)
 
-            neg_ts = sample_neg_triples_for_h(h, pos_rs[0], 1)
-            neg_t_batch += neg_ts
+        if len(pos_rs) == 1:
+            pos_rs = pos_rs[0]  
+        if len(pos_ts) == 1:
+            pos_ts = pos_ts[0]  
+        if len(neg_ts) == 1:
+            neg_ts = neg_ts[0]              
+        
+        return h, pos_rs, pos_ts, neg_ts   
 
-        return heads, pos_r_batch, pos_t_batch, neg_t_batch
 
-    def generate_train_batch(self):
-        heads, relations, pos_tails, neg_tails = self._generate_train_A_batch()
+
+    def as_train_feed_dict(self, model, heads, relations, pos_tails, neg_tails):
 
         batch_data = {}
 
@@ -240,9 +248,7 @@ class CFKG_loader(Data):
         batch_data['relations'] = relations
         batch_data['pos_tails'] = pos_tails
         batch_data['neg_tails'] = neg_tails
-        return batch_data
 
-    def generate_train_feed_dict(self, model, batch_data):
         feed_dict = {
             model.h: batch_data['heads'],
             model.r: batch_data['relations'],
@@ -251,27 +257,12 @@ class CFKG_loader(Data):
 
         }
 
-        # print(batch_data['heads'])
-        # print('\n')
-        # print(batch_data['pos_tails'])
-        # print('\n')
-        # print(batch_data['neg_tails'])
-        # print('\n')
-        # exit()
-
         return feed_dict
 
-
-    def generate_test_feed_dict(self, model, user_batch, item_batch, drop_flag=True):
+        
+    def as_test_feed_dict(self, model, user_batch, item_batch, drop_flag=True):
         user_list = list(np.repeat(user_batch, len(item_batch)))
         item_list = list(np.array(item_batch) + self.n_users) * len(user_batch)
-
-        # print(user_list)
-        # print('\n')
-        # print(item_list)
-
-
-
         feed_dict ={
             model.h: user_list,
             model.r: [0] * len(user_list),
@@ -282,5 +273,5 @@ class CFKG_loader(Data):
 
         }
 
-        return feed_dict
+        return feed_dict  
 
