@@ -4,7 +4,9 @@ Tensorflow Implementation of the Baseline Model, BPRMF, in:
 Wang Xiang et al. KGAT: Knowledge Graph Attention Network for Recommendation. In KDD 2019.
 @author: Xiang Wang (xiangwang@u.nus.edu)
 '''
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
@@ -54,8 +56,9 @@ class BPRMF(object):
 
     def _init_weights(self):
         all_weights = dict()
+        tf.disable_v2_behavior()
 
-        initializer = tf.contrib.layers.xavier_initializer()
+        initializer = tf.initializers.glorot_uniform()
 
         if self.pretrain_data is None:
             all_weights['user_embedding'] = tf.Variable(initializer([self.n_users, self.emb_dim]), name='user_embedding')

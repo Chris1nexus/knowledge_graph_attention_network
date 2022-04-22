@@ -4,7 +4,11 @@ Tensorflow Implementation of Knowledge Graph Attention Network (KGAT) model in:
 Wang Xiang et al. KGAT: Knowledge Graph Attention Network for Recommendation. In KDD 2019.
 @author: Xiang Wang (xiangwang@u.nus.edu)
 '''
-import tensorflow as tf
+from tensorflow.compat.v1 import ConfigProto, InteractiveSession
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+import os
+import sys
 from utility.helper import *
 from utility.batch_test import *
 from time import time
@@ -34,32 +38,38 @@ def load_pretrained_data(args):
 
 
 if __name__ == '__main__':
+
+    config = ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = InteractiveSession(config=config)
     # get argument settings.
+
     tf.set_random_seed(2019)
     np.random.seed(2019)
     args = parse_args()
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
-
+    
     """
     *********************************************************
     Load Data from data_generator function.
     """
     config = dict()
-    config['n_users'] = data_generator.n_users
-    config['n_items'] = data_generator.n_items
-    config['n_relations'] = data_generator.n_relations
-    config['n_entities'] = data_generator.n_entities
+    config['n_users'] = data_generator['dataset'].n_users
+    config['n_items'] = data_generator['dataset'].n_items
+    config['n_relations'] = data_generator['dataset'].n_relations
+    config['n_entities'] = data_generator['dataset'].n_entities
 
     if args.model_type in ['kgat', 'cfkg']:
         "Load the laplacian matrix."
-        config['A_in'] = sum(data_generator.lap_list)
+        config['A_in'] = sum(data_generator['A_dataset'].lap_list)
 
         "Load the KG triplets."
-        config['all_h_list'] = data_generator.all_h_list
-        config['all_r_list'] = data_generator.all_r_list
-        config['all_t_list'] = data_generator.all_t_list
-        config['all_v_list'] = data_generator.all_v_list
+        config['all_h_list'] = data_generator['A_dataset'].all_h_list
+        config['all_r_list'] = data_generator['A_dataset'].all_r_list
+        config['all_t_list'] = data_generator['A_dataset'].all_t_list
+        config['all_v_list'] = data_generator['A_dataset'].all_v_list
+
+        config['n_relations'] = data_generator['A_dataset'].n_relations
 
     t0 = time()
 
@@ -137,7 +147,7 @@ if __name__ == '__main__':
             # *********************************************************
             # get the performance from the model to fine tune.
             if args.report != 1:
-                users_to_test = list(data_generator.test_user_dict.keys())
+                users_to_test = list(data_generator['dataset'].test_user_dict.keys())
 
                 ret = test(sess, model, users_to_test, drop_flag=False, batch_test_flag=batch_test_flag)
                 cur_best_pre_0 = ret['recall'][0]
@@ -192,9 +202,9 @@ if __name__ == '__main__':
     """
     if args.report == 1:
         assert args.test_flag == 'full'
-        users_to_test_list, split_state = data_generator.get_sparsity_split()
+        users_to_test_list, split_state = data_generator['dataset'].get_sparsity_split()
 
-        users_to_test_list.append(list(data_generator.test_user_dict.keys()))
+        users_to_test_list.append(list(data_generator['dataset'].test_user_dict.keys()))
         split_state.append('all')
 
         save_path = '%sreport/%s/%s.result' % (args.proj_path, args.dataset, model.model_type)
@@ -228,7 +238,7 @@ if __name__ == '__main__':
     for epoch in range(args.epoch):
         t1 = time()
         loss, base_loss, kge_loss, reg_loss = 0., 0., 0., 0.
-        n_batch = data_generator.n_train // args.batch_size + 1
+        n_batch = data_generator['dataset'].n_train // args.batch_size + 1
 
         """
         *********************************************************
@@ -238,8 +248,8 @@ if __name__ == '__main__':
         for idx in range(n_batch):
             btime= time()
 
-            batch_data = data_generator.generate_train_batch()
-            feed_dict = data_generator.generate_train_feed_dict(model, batch_data)
+            batch_data = next(data_generator['loader'])# data_generator.generate_train_batch()
+            feed_dict = data_generator['dataset'].as_train_feed_dict(model, *batch_data)
 
             _, batch_loss, batch_base_loss, batch_kge_loss, batch_reg_loss = model.train(sess, feed_dict=feed_dict)
 
@@ -259,15 +269,15 @@ if __name__ == '__main__':
         """
         if args.model_type in ['kgat']:
 
-            n_A_batch = len(data_generator.all_h_list) // args.batch_size_kg + 1
+            n_A_batch = len(data_generator['A_dataset'].all_h_list) // args.batch_size_kg + 1
 
             if args.use_kge is True:
                 # using KGE method (knowledge graph embedding).
                 for idx in range(n_A_batch):
                     btime = time()
 
-                    A_batch_data = data_generator.generate_train_A_batch()
-                    feed_dict = data_generator.generate_train_A_feed_dict(model, A_batch_data)
+                    A_batch_data = next(data_generator['A_loader'])#data_generator.generate_train_A_batch()
+                    feed_dict = data_generator['A_dataset'].as_train_A_feed_dict(model, *A_batch_data)#data_generator.generate_train_A_feed_dict(model, A_batch_data)
 
                     _, batch_loss, batch_kge_loss, batch_reg_loss = model.train_A(sess, feed_dict=feed_dict)
 
@@ -296,7 +306,7 @@ if __name__ == '__main__':
         Test.
         """
         t2 = time()
-        users_to_test = list(data_generator.test_user_dict.keys())
+        users_to_test = list(data_generator['dataset'].test_user_dict.keys())
 
         ret = test(sess, model, users_to_test, drop_flag=False, batch_test_flag=batch_test_flag)
 
