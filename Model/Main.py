@@ -235,6 +235,8 @@ if __name__ == '__main__':
     stopping_step = 0
     should_stop = False
 
+
+    #print(data_generator['dataset'].N_exist_users, ' ', data_generator['dataset'].n_users, ' ', data_generator['dataset'].n_train)
     for epoch in range(args.epoch):
         t1 = time()
         loss, base_loss, kge_loss, reg_loss = 0., 0., 0., 0.
@@ -245,18 +247,35 @@ if __name__ == '__main__':
         Alternative Training for KGAT:
         ... phase 1: to train the recommender.
         """
+        loader_iter = iter(data_generator['loader'])
+        loader_A_iter =  iter(data_generator['A_loader']) if 'A_loader' in data_generator else None
         for idx in range(n_batch):
             btime= time()
 
-            batch_data = next(data_generator['loader'])
+            try:
+                batch_data = next(loader_iter)
+            except:
+                loader_iter = iter(data_generator['loader'])
+                batch_data = next(loader_iter)
             if args.model_type == 'cke':
-                batch_A_data = next(data_generator['A_loader'])
-                feed_dict = data_generator['dataset'].as_train_feed_dict(model, 
-                                                *batch_data, 
-                                                *batch_A_data)
-            else:
-                feed_dict = data_generator['dataset'].as_train_feed_dict(model, *batch_data)
+                try:
+                    batch_A_data = next(loader_A_iter)
+                except:
+                    loader_A_iter = iter(data_generator['A_loader'])
+                    batch_A_data = next(loader_A_iter)                
 
+                if data_generator['dataset'].batch_style == 'list':
+                    batch_data = (*batch_data, *batch_A_data)
+                else:
+                    batch_data.update(batch_A_data)
+            #else:
+            #    feed_dict = data_generator['dataset'].as_train_feed_dict(model, 
+            #                                    batch_data)
+ 
+            feed_dict = data_generator['dataset'].as_train_feed_dict(model, batch_data)#*batch_data)
+            #print(feed_dict)
+            #import time as time_
+            #time_.sleep(5)
             _, batch_loss, batch_base_loss, batch_kge_loss, batch_reg_loss = model.train(sess, feed_dict=feed_dict)
 
             loss += batch_loss
@@ -279,11 +298,18 @@ if __name__ == '__main__':
 
             if args.use_kge is True:
                 # using KGE method (knowledge graph embedding).
+                loader_A_iter =  iter(data_generator['A_loader'])
                 for idx in range(n_A_batch):
                     btime = time()
 
-                    A_batch_data = next(data_generator['A_loader'])#data_generator.generate_train_A_batch()
-                    feed_dict = data_generator['A_dataset'].as_train_A_feed_dict(model, *A_batch_data)#data_generator.generate_train_A_feed_dict(model, A_batch_data)
+
+                    try:
+                        A_batch_data = next(loader_A_iter)
+                    except:
+                        loader_A_iter = iter(data_generator['A_loader'])
+                        A_batch_data = next(loader_A_iter)    
+                    #substitute for data_generator.generate_train_A_batch()
+                    feed_dict = data_generator['A_dataset'].as_train_A_feed_dict(model, A_batch_data)#data_generator.generate_train_A_feed_dict(model, A_batch_data)
 
                     _, batch_loss, batch_kge_loss, batch_reg_loss = model.train_A(sess, feed_dict=feed_dict)
 

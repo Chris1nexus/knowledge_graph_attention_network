@@ -17,12 +17,13 @@ from utility.loader_bprmf import BPRMF_loader
 from utility.load_data import RecomDataset
 from utility.loader_cke import CKE_loader
 from utility.loader_nfm import NFM_loader
-from utility.loader_kgat import KGATDataset
+from utility.loader_kgat import KGAT_loader
 from utility.loader_cfkg import CFKG_loader
 
 
 
-cores = multiprocessing.cpu_count() // 2
+train_cores = multiprocessing.cpu_count()
+test_cores = multiprocessing.cpu_count()//2
 
 args = parse_args()
 Ks = eval(args.Ks)
@@ -31,11 +32,13 @@ data_generator = {}
 if args.model_type == 'bprmf':
     ds =  BPRMF_loader(args=args, path=args.data_path + args.dataset)
     data_generator['dataset'] = ds
-    data_generator['loader'] = cycle(DataLoader(ds, 
+    data_generator['loader'] = DataLoader(ds, 
                     batch_size=ds.batch_size, 
                     shuffle=True,  
-                    num_workers=multiprocessing.cpu_count(),
-                        ))      
+                    num_workers=train_cores,
+                     drop_last=True,
+                     persistent_workers=True
+                        )      
     batch_test_flag = False
 
 elif args.model_type == 'cke':
@@ -43,54 +46,66 @@ elif args.model_type == 'cke':
     cke_ds = RecomDataset(args=args, path=args.data_path + args.dataset)
     data_generator['A_dataset'] = cke_a_ds
     data_generator['dataset'] = cke_ds
-    data_generator['A_loader'] = cycle(DataLoader(cke_a_ds, 
+    data_generator['A_loader'] = DataLoader(cke_a_ds, 
                     batch_size=cke_a_ds.batch_size_kg, 
                     shuffle=True,  
-                    num_workers=multiprocessing.cpu_count(),
-                        ))
-    data_generator['loader'] = cycle(DataLoader(cke_ds, 
+                    num_workers=train_cores,
+                    drop_last=True,
+                    persistent_workers=True
+                        )
+    data_generator['loader'] = DataLoader(cke_ds, 
                     batch_size=cke_ds.batch_size, 
                     shuffle=True,  
-                    num_workers=multiprocessing.cpu_count(),
-                        ))  
+                    num_workers=train_cores,
+                    drop_last=True,
+                    persistent_workers=True
+                        )
 
     batch_test_flag = False
 
 elif args.model_type in ['cfkg']:
     ds = CFKG_loader(args=args, path=args.data_path + args.dataset)
     data_generator['dataset'] = ds
-    data_generator['loader'] = cycle(DataLoader(ds, 
+    data_generator['loader'] = DataLoader(ds, 
                     batch_size=ds.batch_size, 
                     shuffle=True,  
-                    num_workers=multiprocessing.cpu_count(),
-                        ))        
+                    num_workers=train_cores,
+                    drop_last=True,
+                    persistent_workers=True                    
+                        ) 
     batch_test_flag = True
 
 elif args.model_type in ['fm','nfm']:
     ds = NFM_loader(args=args, path=args.data_path + args.dataset)
     data_generator['dataset'] = ds
-    data_generator['loader'] = cycle(DataLoader(ds, 
+    data_generator['loader'] = DataLoader(ds, 
                     batch_size=ds.batch_size, 
                     shuffle=True,  
-                    num_workers=multiprocessing.cpu_count(),
-                        ))    
+                    num_workers=train_cores,
+                    drop_last=True,
+                    persistent_workers=True
+                        )
     batch_test_flag = True
 
 elif args.model_type in ['kgat']:
-    kgat_a_ds = KGATDataset(args=args, path=args.data_path + args.dataset)
+    kgat_a_ds = KGAT_loader(args=args, path=args.data_path + args.dataset)
     kgat_ds = RecomDataset(args=args, path=args.data_path + args.dataset)
     data_generator['A_dataset'] = kgat_a_ds
     data_generator['dataset'] = kgat_ds
-    data_generator['A_loader'] = cycle(DataLoader(kgat_a_ds, 
+    data_generator['A_loader'] = DataLoader(kgat_a_ds, 
                     batch_size=kgat_a_ds.batch_size_kg, 
                     shuffle=True,  
-                    num_workers=multiprocessing.cpu_count(),
-                        ))
-    data_generator['loader'] = cycle(DataLoader(kgat_ds, 
+                    num_workers=train_cores,
+                    drop_last=True,
+                    persistent_workers=True
+                        )
+    data_generator['loader'] = DataLoader(kgat_ds, 
                     batch_size=kgat_ds.batch_size, 
                     shuffle=True,  
-                    num_workers=multiprocessing.cpu_count(),
-                        ))    
+                    num_workers=train_cores,
+                    drop_last=True,
+                    persistent_workers=True
+                        )
     batch_test_flag = False
 
 
@@ -200,7 +215,7 @@ def test(sess, model, users_to_test, drop_flag=False, batch_test_flag=False):
     result = {'precision': np.zeros(len(Ks)), 'recall': np.zeros(len(Ks)), 'ndcg': np.zeros(len(Ks)),
               'hit_ratio': np.zeros(len(Ks)), 'auc': 0.}
 
-    pool = multiprocessing.Pool(cores)
+    pool = multiprocessing.Pool(test_cores)
 
     if args.model_type in ['ripple']:
 

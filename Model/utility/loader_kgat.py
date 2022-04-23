@@ -16,9 +16,9 @@ import math
 
 
 
-class KGATDataset(RecomDataset):
-    def __init__(self, args, path):
-        super().__init__(args, path)
+class KGAT_loader(RecomDataset):
+    def __init__(self, args, path, batch_style='list'):
+        super().__init__(args, path, batch_style)
 
         # generate the sparse adjacency matrices for user-item interaction & relational kg data.
         self.adj_list, self.adj_r_list = self._get_relational_adj_list()
@@ -255,19 +255,56 @@ class KGATDataset(RecomDataset):
         if len(neg_ts) == 1:
             neg_ts = neg_ts[0]              
         
-        return h, pos_rs, pos_ts, neg_ts
+        if self.batch_style_id == 0:
+            return h, pos_rs, pos_ts, neg_ts
+        else:
+            return {'heads': h, 'relations': pos_rs, 'pos_tails':pos_ts, 'neg_tails':neg_ts} 
 
    
-   
+    def as_test_feed_dict(self, model, user_batch, item_batch, drop_flag=True):
 
-    def as_train_A_feed_dict(self, model, heads, relations, pos_tails, neg_tails ):
+        feed_dict ={
+            model.users: user_batch,
+            model.pos_items: item_batch,
+            model.mess_dropout: [0.] * len(eval(self.args.layer_size)),
+            model.node_dropout: [0.] * len(eval(self.args.layer_size)),
 
-        batch_data = {}
+        }
 
-        batch_data['heads'] = heads
-        batch_data['relations'] = relations
-        batch_data['pos_tails'] = pos_tails
-        batch_data['neg_tails'] = neg_tails
+        return feed_dict  
+    def as_train_feed_dict(self, model, batch_data):
+        if self.batch_style_id == 0:
+            users, pos_items, neg_items = batch_data
+            batch_data = {}
+            batch_data['users'] = users
+            batch_data['pos_items'] = pos_items
+            batch_data['neg_items'] = neg_items
+
+        feed_dict = {
+            model.users: batch_data['users'],
+            model.pos_items: batch_data['pos_items'],
+            model.neg_items: batch_data['neg_items'],
+
+            model.mess_dropout: eval(self.args.mess_dropout),
+            model.node_dropout: eval(self.args.node_dropout),
+        }
+
+        return feed_dict  
+
+    def as_train_A_feed_dict(self, model, batch_data):
+        if self.batch_style_id == 0:
+            heads, relations, pos_tails, neg_tails = batch_data
+            batch_data = {}
+            batch_data['heads'] = heads
+            batch_data['relations'] = relations
+            batch_data['pos_tails'] = pos_tails
+            batch_data['neg_tails'] = neg_tails  
+        #batch_data = {}
+
+        #batch_data['heads'] = heads
+        #batch_data['relations'] = relations
+        #batch_data['pos_tails'] = pos_tails
+        #batch_data['neg_tails'] = neg_tails
         
         feed_dict = {
             model.h: batch_data['heads'],

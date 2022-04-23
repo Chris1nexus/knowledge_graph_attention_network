@@ -13,8 +13,8 @@ import collections
 from utility.load_data import RecomDataset
 
 class CFKG_loader(RecomDataset):
-    def __init__(self, args, path):
-        super().__init__(args, path)
+    def __init__(self, args, path, batch_style='list'):
+        super().__init__(args, path, batch_style)
         self.batch_size_kg = self.batch_size
         # generate the sparse adjacency matrices for user-item interaction & relational kg data.
         self.adj_list, self.adj_r_list = self._get_relational_adj_list()
@@ -236,18 +236,28 @@ class CFKG_loader(RecomDataset):
         if len(neg_ts) == 1:
             neg_ts = neg_ts[0]              
         
-        return h, pos_rs, pos_ts, neg_ts   
+        if self.batch_style_id == 0:
+            return h, pos_rs, pos_ts, neg_ts
+        else:
+            return {'heads': h, 'relations': pos_rs, 'pos_tails':pos_ts, 'neg_tails':neg_ts} 
 
 
 
-    def as_train_feed_dict(self, model, heads, relations, pos_tails, neg_tails):
+    def as_train_feed_dict(self, model, batch_data):#heads, relations, pos_tails, neg_tails):
+        if self.batch_style_id == 0:
+            heads, relations, pos_tails, neg_tails = batch_data
+            batch_data = {}
+            batch_data['heads'] = heads
+            batch_data['relations'] = relations
+            batch_data['pos_tails'] = pos_tails
+            batch_data['neg_tails'] = neg_tails            
 
-        batch_data = {}
+        #batch_data = {}
 
-        batch_data['heads'] = heads
-        batch_data['relations'] = relations
-        batch_data['pos_tails'] = pos_tails
-        batch_data['neg_tails'] = neg_tails
+        #batch_data['heads'] = heads
+        #batch_data['relations'] = relations
+        #batch_data['pos_tails'] = pos_tails
+        #batch_data['neg_tails'] = neg_tails
 
         feed_dict = {
             model.h: batch_data['heads'],

@@ -10,8 +10,8 @@ from utility.load_data import RecomDataset
 import scipy.sparse as sp
 
 class NFM_loader(RecomDataset):
-    def __init__(self, args, path):
-        super().__init__(args, path)
+    def __init__(self, args, path, batch_style='list'):
+        super().__init__(args, path, batch_style)
         # generate the sparse matrix for the knowledge graph features.
         kg_feat_file = path + '/kg_feat.npz'
         self.kg_feat_mat = self.get_kg_feature(kg_feat_file)
@@ -91,8 +91,15 @@ class NFM_loader(RecomDataset):
         }
 
         return feed_dict
-    def as_train_feed_dict(self, model, users, pos_items, neg_items):
-        batch_data = {}
+
+
+  
+    def as_train_feed_dict(self, model, batch_data):
+        if self.batch_style_id == 0:
+            users, pos_items, neg_items = batch_data
+        else:
+            users, pos_items, neg_items = batch_data['users'], batch_data['pos_items'], batch_data['neg_items']
+
         u_sp = self.user_one_hot[users]
         pos_i_sp = self.kg_feat_mat[pos_items]
         neg_i_sp = self.kg_feat_mat[neg_items]

@@ -10,10 +10,11 @@ from utility.load_data import Data, RecomDataset
 
 
 class CKE_loader(RecomDataset):
-    def __init__(self, args, path):
-        super().__init__(args, path)
+    def __init__(self, args, path, batch_style='list'):
+        super().__init__(args, path, batch_style)
 
         self.exist_heads = list(self.kg_dict.keys())
+        self.N_exist_heads = len(self.exist_heads)
     def __getitem__(self, idx): 
         
         def sample_pos_triples_for_h(h, num):
@@ -57,23 +58,27 @@ class CKE_loader(RecomDataset):
         if len(neg_ts) == 1:
             neg_ts = neg_ts[0]              
         
-        return h, pos_rs, pos_ts, neg_ts   
+        if self.batch_style_id == 0:
+            return h, pos_rs, pos_ts, neg_ts
+        else:
+            return {'heads': h, 'relations': pos_rs, 'pos_tails':pos_ts, 'neg_tails':neg_ts}   
 
 
 
 
 
-    def as_train_feed_dict(self, model, users, pos_items, neg_items, heads, relations, pos_tails, neg_tails ):
+    def as_train_feed_dict(self, model, batch_data):#users, pos_items, neg_items, heads, relations, pos_tails, neg_tails ):
+        if self.batch_style_id == 0:
+            users, pos_items, neg_items, heads, relations, pos_tails, neg_tails = batch_data
+            batch_data = {}
+            batch_data['users'] = users
+            batch_data['pos_items'] = pos_items
+            batch_data['neg_items'] = neg_items
+            batch_data['heads'] = heads
+            batch_data['relations'] = relations
+            batch_data['pos_tails'] = pos_tails
+            batch_data['neg_tails'] = neg_tails            
 
-        batch_data = {}
-        batch_data['users'] = users
-        batch_data['pos_items'] = pos_items
-        batch_data['neg_items'] = neg_items
-
-        batch_data['heads'] = heads
-        batch_data['relations'] = relations
-        batch_data['pos_tails'] = pos_tails
-        batch_data['neg_tails'] = neg_tails
 
         feed_dict ={
             model.u: batch_data['users'],
@@ -90,7 +95,7 @@ class CKE_loader(RecomDataset):
         return feed_dict
 
         
-    def as_test_feed_dict(self, model, user_batch, item_batch, drop_flag=True):
+    def as_test_feed_dict(self, model, user_batch, item_batch, drop_flag=False):
         feed_dict = {
             model.u: user_batch,
             model.pos_i: item_batch

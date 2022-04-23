@@ -15,10 +15,15 @@ import math
 
 class RecomDataset(Dataset):
     
-    def __init__(self, args, path):
+    def __init__(self, args, path, batch_style='list'):
         super(RecomDataset).__init__()
+        
+        self.batch_styles = {'list':0,'map':1}
+        assert batch_style in list(self.batch_styles.keys()), f'Error: got {batch_style} but valid batch styles are {list(self.batch_styles.keys())}'
         self.path = path
         self.args = args
+        self.batch_style = batch_style
+        self.batch_style_id = self.batch_styles[self.batch_style]
 
         self.batch_size = args.batch_size
 
@@ -227,7 +232,14 @@ class RecomDataset(Dataset):
             pos_item = pos_item[0]
         if len(neg_item) == 1:
             neg_item = neg_item[0]            
-        return u, pos_item, neg_item #users, pos_items, neg_items
+        
+
+        if self.batch_style_id == 0:
+            return u, pos_item, neg_item
+        else:
+            return {'users': u, 'pos_items': pos_item, 'neg_items':neg_item}#u, pos_item, neg_item #users, pos_items, neg_items
+
+ 
     def as_test_feed_dict(self, model, user_batch, item_batch, drop_flag=True):
 
         feed_dict ={
@@ -239,11 +251,15 @@ class RecomDataset(Dataset):
         }
 
         return feed_dict  
-    def as_train_feed_dict(self, model, users, pos_items, neg_items):
-        batch_data = {}
-        batch_data['users'] = users
-        batch_data['pos_items'] = pos_items
-        batch_data['neg_items'] = neg_items
+    def as_train_feed_dict(self, model, batch_data):
+        if self.batch_style_id == 0:
+            users, pos_items, neg_items = batch_data
+            batch_data = {}
+            batch_data['users'] = users
+            batch_data['pos_items'] = pos_items
+            batch_data['neg_items'] = neg_items
+
+
         feed_dict = {
             model.users: batch_data['users'],
             model.pos_items: batch_data['pos_items'],
@@ -254,6 +270,7 @@ class RecomDataset(Dataset):
         }
 
         return feed_dict   
+
 
 class Data(object):
     def __init__(self, args, path):

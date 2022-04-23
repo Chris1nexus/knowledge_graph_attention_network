@@ -9,11 +9,11 @@ from utility.load_data import RecomDataset
 
 
 class BPRMF_loader(RecomDataset):
-    def __init__(self, args, path):
-        super().__init__(args, path)
+    def __init__(self, args, path, batch_style='list'):
+        super().__init__(args, path, batch_style)
 
 
-    def as_test_feed_dict(self, model, user_batch, item_batch, drop_flag=True):
+    def as_test_feed_dict(self, model, user_batch, item_batch, drop_flag=False):
 
         feed_dict = {
             model.users: user_batch,
@@ -21,11 +21,17 @@ class BPRMF_loader(RecomDataset):
         }
 
         return feed_dict  
-    def as_train_feed_dict(self, model, users, pos_items, neg_items):
-        batch_data = {}
-        batch_data['users'] = users
-        batch_data['pos_items'] = pos_items
-        batch_data['neg_items'] = neg_items
+    def as_train_feed_dict(self, model,batch_data):# users, pos_items, neg_items):
+        if self.batch_style_id == 0:
+            users, pos_items, neg_items = batch_data
+            batch_data = {}
+            batch_data['users'] = users
+            batch_data['pos_items'] = pos_items
+            batch_data['neg_items'] = neg_items       
+        #batch_data = {}
+        #batch_data['users'] = users
+        #batch_data['pos_items'] = pos_items
+        #batch_data['neg_items'] = neg_items
         feed_dict = {
             model.users: batch_data['users'],
             model.pos_items: batch_data['pos_items'],

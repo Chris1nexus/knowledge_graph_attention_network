@@ -1,0 +1,8 @@
+Model/Untitled-Copy1.ipynb
+Model/Untitled.ipynb
+Data/mod_datasets/*
+Data/cell/*
+Data/amazon-book/kg_final.txt 
+Data/last-fm/kg_final.txt
+Data/yelp2018/kg_final.txt
+Model/weights/*
