@@ -48,7 +48,17 @@ if __name__ == '__main__':
     np.random.seed(2019)
     args = parse_args()
 
-    
+    STORAGE_DIR = f'{args.model_type}_{args.dataset}'
+    import os
+    import wandb
+    os.makedirs(STORAGE_DIR, exist_ok=True)
+
+    if args.wandb :
+        wandb.init(project=STORAGE_DIR,
+                    config=vars(args),
+                       entity="chris1nexus",
+                       #name=args.dataset
+                       )    
     """
     *********************************************************
     Load Data from data_generator function.
@@ -60,16 +70,18 @@ if __name__ == '__main__':
     config['n_entities'] = data_generator['dataset'].n_entities
 
     if args.model_type in ['kgat', 'cfkg']:
+
+        key = 'A_dataset' if args.model_type == 'kgat' else 'dataset'
         "Load the laplacian matrix."
-        config['A_in'] = sum(data_generator['A_dataset'].lap_list)
+        config['A_in'] = sum(data_generator[key].lap_list) 
 
         "Load the KG triplets."
-        config['all_h_list'] = data_generator['A_dataset'].all_h_list
-        config['all_r_list'] = data_generator['A_dataset'].all_r_list
-        config['all_t_list'] = data_generator['A_dataset'].all_t_list
-        config['all_v_list'] = data_generator['A_dataset'].all_v_list
+        config['all_h_list'] = data_generator[key].all_h_list
+        config['all_r_list'] = data_generator[key].all_r_list
+        config['all_t_list'] = data_generator[key].all_t_list
+        config['all_v_list'] = data_generator[key].all_v_list
 
-        config['n_relations'] = data_generator['A_dataset'].n_relations
+        config['n_relations'] = data_generator[key].n_relations
 
     t0 = time()
 
@@ -234,7 +246,9 @@ if __name__ == '__main__':
     loss_loger, pre_loger, rec_loger, ndcg_loger, hit_loger = [], [], [], [], []
     stopping_step = 0
     should_stop = False
-
+    t0 = time()
+    train_time = 0
+    test_time = 0
 
     #print(data_generator['dataset'].N_exist_users, ' ', data_generator['dataset'].n_users, ' ', data_generator['dataset'].n_train)
     for epoch in range(args.epoch):
@@ -249,6 +263,8 @@ if __name__ == '__main__':
         """
         loader_iter = iter(data_generator['loader'])
         loader_A_iter =  iter(data_generator['A_loader']) if 'A_loader' in data_generator else None
+
+        train_start = time()
         for idx in range(n_batch):
             btime= time()
 
@@ -268,11 +284,14 @@ if __name__ == '__main__':
                     batch_data = (*batch_data, *batch_A_data)
                 else:
                     batch_data.update(batch_A_data)
-            #else:
+
+                feed_dict = data_generator['A_dataset'].as_train_feed_dict(model, batch_data)
+            else:
+                feed_dict = data_generator['dataset'].as_train_feed_dict(model, batch_data)
             #    feed_dict = data_generator['dataset'].as_train_feed_dict(model, 
             #                                    batch_data)
- 
-            feed_dict = data_generator['dataset'].as_train_feed_dict(model, batch_data)#*batch_data)
+            #print(batch_data)
+            #feed_dict = data_generator['dataset'].as_train_feed_dict(model, batch_data)#*batch_data)
             #print(feed_dict)
             #import time as time_
             #time_.sleep(5)
@@ -283,6 +302,18 @@ if __name__ == '__main__':
             kge_loss += batch_kge_loss
             reg_loss += batch_reg_loss
 
+
+        train_time += time()-train_start
+        if args.wandb:
+            log_dict = {'train_total_loss':loss,
+                'train_base_loss':base_loss,
+                'train_reg_loss':reg_loss,
+                'train_kge_loss':kge_loss,
+                'train_time': train_time}
+            if  args.model_type != 'kgat':
+                wandb.log(log_dict)
+            elif  args.model_type == 'kgat' and args.use_kge == False:
+                wandb.log(log_dict)
         if np.isnan(loss) == True:
             print('ERROR: loss@phase1 is nan.')
             sys.exit()
@@ -298,6 +329,7 @@ if __name__ == '__main__':
 
             if args.use_kge is True:
                 # using KGE method (knowledge graph embedding).
+                train_start = time() 
                 loader_A_iter =  iter(data_generator['A_loader'])
                 for idx in range(n_A_batch):
                     btime = time()
@@ -316,6 +348,17 @@ if __name__ == '__main__':
                     loss += batch_loss
                     kge_loss += batch_kge_loss
                     reg_loss += batch_reg_loss
+
+
+
+                train_time += time() - train_start
+                log_dict = {'train_total_loss':loss,
+                    'train_base_loss':base_loss,
+                    'train_reg_loss':reg_loss,
+                    'train_kge_loss':kge_loss,
+                    'time':  train_time}                    
+                if args.wandb :
+                    wandb.log(log_dict)
 
             if args.use_att is True:
                 # updating attentive laplacian matrix.
@@ -353,6 +396,15 @@ if __name__ == '__main__':
         pre_loger.append(ret['precision'])
         ndcg_loger.append(ret['ndcg'])
         hit_loger.append(ret['hit_ratio'])
+        metrics_logs ={ }
+        for metric_name, metric_values in ret.items():
+            if metric_name !='auc':
+                for idx, k in enumerate(Ks):
+                    metrics_logs[f'{metric_name}@{k}'] = metric_values[idx]
+        test_time += t3 -t2
+        metrics_logs['test_time'] = test_time
+        if args.wandb :
+            wandb.log(metrics_logs)
 
         if args.verbose > 0:
             perf_str = 'Epoch %d [%.1fs + %.1fs]: train==[%.5f=%.5f + %.5f + %.5f], recall=[%.5f, %.5f], ' \

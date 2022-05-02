@@ -41,6 +41,10 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
 
+    parser.add_argument('--with_replacement', type=bool, default=True,
+                        help='whether to use replacement for sampling')
+
+
     parser.add_argument('--model_type', nargs='?', default='kgat',
                         help='Specify a loss type from {kgat, bprmf, fm, nfm, cke, cfkg}.')
     parser.add_argument('--adj_type', nargs='?', default='si',
@@ -77,5 +81,6 @@ def parse_args():
     
     parser.add_argument('--l1_flag', type=bool, default=True,
                         help='Flase: using the L2 norm, True: using the L1 norm.')
-
+    parser.add_argument('--wandb', type=bool, default=False,
+                    help='whether to log to wandb (requires setting the api key from command line as wandb login YOUR-API-KEY)')
     return parser.parse_args()

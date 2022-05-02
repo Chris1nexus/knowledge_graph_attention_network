@@ -28,15 +28,18 @@ class RecomDataset(Dataset):
         self.batch_size = args.batch_size
 
         train_file = path + '/train.txt'
+        validation_file =  path + '/valid.txt'
         test_file = path + '/test.txt'
 
         kg_file = path + '/kg_final.txt'
 
         # ----------get number of users and items & then load rating data from train_file & test_file------------.
-        self.n_train, self.n_test = 0, 0
+        self.n_train, self.n_valid, self.n_test = 0, 0, 0
+
         self.n_users, self.n_items = 0, 0
 
         self.train_data, self.train_user_dict = self._load_ratings(train_file)
+        self.valid_data, self.valid_user_dict = self._load_ratings(validation_file)
         self.test_data, self.test_user_dict = self._load_ratings(test_file)
         self.exist_users = list(self.train_user_dict.keys())
         self.N_exist_users = len(self.exist_users)
@@ -73,8 +76,10 @@ class RecomDataset(Dataset):
 
     def _statistic_ratings(self):
         self.n_users = max(max(self.train_data[:, 0]), max(self.test_data[:, 0])) + 1
-        self.n_items = max(max(self.train_data[:, 1]), max(self.test_data[:, 1])) + 1
+        self.n_items = max(max(max(self.train_data[:, 1]), max(self.valid_data[:, 1])  ),
+                                max(self.test_data[:, 1])) + 1
         self.n_train = len(self.train_data)
+        self.n_valid = len(self.valid_data)
         self.n_test = len(self.test_data)
 
     # reading train & test interaction data.

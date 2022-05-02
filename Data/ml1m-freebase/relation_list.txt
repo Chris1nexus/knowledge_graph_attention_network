@@ -1,0 +1,10 @@
+org_id remap_id
+edited_by 0
+starring 1
+belong_to_genre 2
+produced_by 3
+directed_by 4
+writted_by 5
+cinematography 6
+produced_by_company 7
+produced_in 8
